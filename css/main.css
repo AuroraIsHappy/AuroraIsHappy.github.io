@@ -1221,7 +1221,7 @@ pre code {
   vertical-align: middle;
 }
 .links-of-author a::before {
-  background: #bf75c2;
+  background: #9473ff;
   display: inline-block;
   margin-right: 3px;
   transform: translateY(-2px);
@@ -2628,4 +2628,21 @@ header.header {
   .sidebar-active .footer-fixed {
     left: 320px;
   }
+}
+.site-meta .brand {
+  background: transparent !important;
+  box-shadow: none !important;
+}
+.site-meta .brand:hover {
+  background: transparent !important;
+}
+.site-title {
+  color: #111 !important;
+  font-weight: 700 !important;
+}
+.site-subtitle {
+  color: #666;
+}
+.site-nav-right {
+  display: none;
 }
