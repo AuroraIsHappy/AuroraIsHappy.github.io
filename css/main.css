@@ -1221,7 +1221,7 @@ pre code {
   vertical-align: middle;
 }
 .links-of-author a::before {
-  background: #ff3736;
+  background: #b159fe;
   display: inline-block;
   margin-right: 3px;
   transform: translateY(-2px);
@@ -2643,7 +2643,7 @@ header.header {
 .site-title {
   color: #111 !important;
   font-weight: 700 !important;
-  font-size: 2.35rem;
+  font-size: 1.7rem;
   line-height: 1.2;
 }
 .site-subtitle {
@@ -2657,7 +2657,7 @@ header.header {
   display: none;
 }
 .posts-expand .post-title {
-  font-size: 1.75rem;
+  font-size: 1.35rem;
   font-weight: 700;
   line-height: 1.3;
 }
@@ -2672,12 +2672,12 @@ header.header {
 }
 @media (max-width: 767px) {
   .site-title {
-    font-size: 1.95rem;
+    font-size: 1.55rem;
   }
   .site-subtitle {
     font-size: 1rem;
   }
   .posts-expand .post-title {
-    font-size: 1.45rem;
+    font-size: 1.2rem;
   }
 }
