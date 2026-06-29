@@ -307,13 +307,15 @@
 <li>Not learnable; also the extrapolation doesn’t really work</li>
 </ul>
 <ol>
-<li><p>Learned absolute position representations</p>
-</li>
-<li><p>Other (RoPE, etc.)</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">wpe = nn.Embedding(config.block_size, config.n_embd) #Learnable Embedding, update matrix (block_size,n_embd)</span><br></pre></td></tr></table></figure>
-<p>Then these two vectors are added during the forward pass.</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">tok_emb = self.transformer.wte(idx) </span><br><span class="line">pos_emb = self.transformer.wpe(pos)</span><br><span class="line">x = self.transformer.drop(tok_emb + pos_emb)</span><br><span class="line">for block in self.transformer.h:</span><br><span class="line">    x = block(x)</span><br><span class="line">x = self.transformer.ln_f(x)</span><br></pre></td></tr></table></figure></li>
+<li>Learned absolute position representations</li>
 </ol>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">wpe = nn.Embedding(config.block_size, config.n_embd) #Learnable Embedding, update matrix (block_size,n_embd)</span><br></pre></td></tr></table></figure>
+
+<ol start="2">
+<li>Other (RoPE, etc.)</li>
+</ol>
+<p>Then these two vectors are added during the forward pass.</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">tok_emb = self.transformer.wte(idx) </span><br><span class="line">pos_emb = self.transformer.wpe(pos)</span><br><span class="line">x = self.transformer.drop(tok_emb + pos_emb)</span><br><span class="line">for block in self.transformer.h:</span><br><span class="line">    x = block(x)</span><br><span class="line">x = self.transformer.ln_f(x)</span><br></pre></td></tr></table></figure>
 <h3 id="Encoder"><a href="#Encoder" class="headerlink" title="Encoder"></a>Encoder</h3><p>The encoder is composed of a stack of N identical layers (they do not share weights).</p>
 <h4 id="Multi-head-attention"><a href="#Multi-head-attention" class="headerlink" title="Multi-head attention"></a>Multi-head attention</h4><blockquote>
 <p>X (input matrix) * W_i_q,W_i_k,W_i_v (weight matrices) -&gt; Q_i,K_i,V_i (attention matrices) -&gt; multiply &amp; softmax -&gt; different Z matrices -&gt; concat -&gt; * a weight matrix W_o -&gt; the output Z matrix (with enough information from the sequence) to be sent forward to the FFN</p>
