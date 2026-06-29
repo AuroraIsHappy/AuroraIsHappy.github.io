@@ -19,12 +19,12 @@
 
 <script class="next-config" data-name="main" type="application/json">{"hostname":"auroraishappy.github.io","root":"/","images":"/images","scheme":"Muse","darkmode":false,"version":"8.27.0","exturl":false,"sidebar":{"position":"left","width_expanded":320,"width_dual_column":240,"display":"always","padding":18,"offset":12},"hljswrap":true,"codeblock":{"theme":{"light":"default","dark":"stackoverflow-dark"},"prism":{"light":"prism","dark":"prism-dark"},"copy_button":{"enable":false,"style":null},"fold":{"enable":false,"height":500},"language":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"stickytabs":false,"motion":{"enable":true,"async":false,"duration":200,"transition":{"menu_item":"fadeInDown","post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"i18n":{"placeholder":"Searching...","empty":"We didn't find any results for the search: ${query}","hits_time":"${hits} results found in ${time} ms","hits":"${hits} results found"},"path":"/search.json","localsearch":{"enable":true,"top_n_per_article":2,"unescape":false,"preload":false,"trigger":"auto"}}</script><script src="/js/config.js" defer></script>
 
-    <meta name="description" content="Background:I’ve been exploring papers on LLM agents (memory, agentic-RL, multi-agent systems) quite a lot for the past two months. I came across lots of effective methods, but I felt confused when ask">
+    <meta name="description" content="Background:I’ve been exploring papers on LLM agents (memory, agentic RL, multi-agent systems) quite a lot for the past two months. I came across lots of effective methods, but I felt confused when ask">
 <meta property="og:type" content="article">
 <meta property="og:title" content="Revisiting Transformer Basics (and rethinking what we do for agents in 2026 from a transformer vs. brain perspective)">
 <meta property="og:url" content="https://auroraishappy.github.io/2026/06/23/revisiting-transformer-basics/">
 <meta property="og:site_name" content="Aurora&#39;s Learning Log">
-<meta property="og:description" content="Background:I’ve been exploring papers on LLM agents (memory, agentic-RL, multi-agent systems) quite a lot for the past two months. I came across lots of effective methods, but I felt confused when ask">
+<meta property="og:description" content="Background:I’ve been exploring papers on LLM agents (memory, agentic RL, multi-agent systems) quite a lot for the past two months. I came across lots of effective methods, but I felt confused when ask">
 <meta property="og:locale" content="en_US">
 <meta property="og:image" content="https://auroraishappy.github.io/2026/06/23/revisiting-transformer-basics/transformer.png">
 <meta property="og:image" content="https://auroraishappy.github.io/2026/06/23/revisiting-transformer-basics/res%20visualization.png">
@@ -37,7 +37,7 @@
 <meta property="og:image" content="https://auroraishappy.github.io/2026/06/23/revisiting-transformer-basics/neurons_fidelity.png">
 <meta property="og:image" content="https://auroraishappy.github.io/2026/06/23/revisiting-transformer-basics/brief_history_of_intelligence.png">
 <meta property="article:published_time" content="2026-06-22T18:05:00.000Z">
-<meta property="article:modified_time" content="2026-06-29T10:10:08.506Z">
+<meta property="article:modified_time" content="2026-06-29T10:11:48.817Z">
 <meta property="article:author" content="Aurora">
 <meta property="article:tag" content="transformer">
 <meta property="article:tag" content="deep-learning">
@@ -297,7 +297,7 @@
     
     
     
-    <div class="post-body" itemprop="articleBody"><h2 id="Background"><a href="#Background" class="headerlink" title="Background:"></a>Background:</h2><p>I’ve been exploring papers on LLM agents (memory, agentic-RL, multi-agent systems) quite a lot for the past two months. I came across lots of effective methods, but I felt confused when asking myself, “How should I view these methods from a relatively unified perspective?” and “What deserves trying next?” I also felt that although “thinking from your agent’s perspective” is a great design strategy, perhaps I shouldn’t view models as humans all the time because the architectures of transformers and the human brain are completely different. That’s why I decided to step back and review the internals of the transformer (code &amp; math) to remind myself what is happening under the hood.</p>
+    <div class="post-body" itemprop="articleBody"><h2 id="Background"><a href="#Background" class="headerlink" title="Background:"></a>Background:</h2><p>I’ve been exploring papers on LLM agents (memory, agentic RL, multi-agent systems) quite a lot for the past two months. I came across lots of effective methods, but I felt confused when asking myself, “How should I view these methods from a relatively unified perspective?” and “What deserves trying next?” I also felt that although “thinking from your agent’s perspective” is a great design strategy, perhaps I shouldn’t view models as humans all the time because the architectures of transformers and the human brain are completely different. That’s why I decided to step back and review the internals of the transformer (code &amp; math) to remind myself what is happening under the hood.</p>
 <p>I also recorded a few recent immature thoughts on transformers vs. brains, and my rethinking about what we have done for agents in 2026 (from super-human knowledge to human-like “intelligence”). I hope I’m not making too many mistakes in this part.</p>
 <h2 id="Transformer-Basics"><a href="#Transformer-Basics" class="headerlink" title="Transformer Basics"></a>Transformer Basics</h2><figure>
  <img src="/2026/06/23/revisiting-transformer-basics/transformer.png" alt="Attention is all you need." width="450">
