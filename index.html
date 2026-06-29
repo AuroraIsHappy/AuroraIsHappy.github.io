@@ -65,6 +65,12 @@
 
 
 
+  
+
+  <script class="next-config" data-name="enableMath" type="application/json">true</script><script class="next-config" data-name="mathjax" type="application/json">{"enable":true,"tags":"ams","js":{"url":"https://cdnjs.cloudflare.com/ajax/libs/mathjax/3.2.2/es5/tex-mml-chtml.js","integrity":"sha256-MASABpB4tYktI2Oitl4t+78w/lyA+D7b/s9GEP0JOGI="}}</script>
+<script src="/js/third-party/math/mathjax.js" defer></script>
+
+
 
   <noscript>
     <link rel="stylesheet" href="/css/noscript.css">
@@ -227,7 +233,7 @@
     </span>
       <header class="post-header">
         <h2 class="post-title" itemprop="name headline">
-          <a href="/2026/06/23/revisiting-transformer-basics/" class="post-title-link" itemprop="url">Revisiting Transformer Basics</a>
+          <a href="/2026/06/23/revisiting-transformer-basics/" class="post-title-link" itemprop="url">Revisiting Transformer Basics (and rethinking what we do for agents in 2026 from a transformer vs. brain perspective)</a>
         </h2>
 
         <div class="post-meta-container">
@@ -257,14 +263,14 @@
         <i class="far fa-file-word"></i>
       </span>
       <span class="post-meta-item-text">Word count in article: </span>
-      <span>0</span>
+      <span>18k</span>
     </span>
     <span class="post-meta-item" title="Reading time">
       <span class="post-meta-item-icon">
         <i class="far fa-clock"></i>
       </span>
       <span class="post-meta-item-text">Reading time &asymp;</span>
-      <span>1 mins.</span>
+      <span>16 mins.</span>
     </span>
 </div>
 
@@ -275,7 +281,222 @@
     
     
     <div class="post-body" itemprop="articleBody">
-          
+          <h2 id="Background"><a href="#Background" class="headerlink" title="Background:"></a>Background:</h2><p>I’ve been exploring papers on LLM agents (memory, RL, multi-agent systems) quite a lot for the past two months. I came across lots of effective methods, but I felt confused when asking myself, “How should I view these methods from a relatively unified perspective?” and “What deserves trying next?” I also felt that although “thinking from your agent’s perspective” is a great design strategy, perhaps I shouldn’t view models as humans all the time because the architectures of transformers and the human brain are completely different. That’s why I decided to step back and review the internals of the transformer (code &amp; math) to remind myself what is happening under the hood.</p>
+<p>I also recorded a few recent immature thoughts on transformers vs. brains, and my rethinking about what we have done for agents in 2026 (from super-human knowledge to human-like “intelligence”). I hope I’m not making too many mistakes in this part.</p>
+<h2 id="Transformer-Basics"><a href="#Transformer-Basics" class="headerlink" title="Transformer Basics"></a>Transformer Basics</h2><figure>
+ <img src="transformer.png" alt="Attention is all you need." width="450">
+ <figcaption>Attention Is All You Need (<a target="_blank" rel="noopener" href="https://arxiv.org/abs/1706.03762">Vaswani et al., 2017</a>)<br>image source: <a target="_blank" rel="noopener" href="https://arxiv.org/abs/1706.03762">Attention Is All You Need</a></figcaption>
+</figure>
+
+<h3 id="Input-Embedding"><a href="#Input-Embedding" class="headerlink" title="Input Embedding"></a>Input Embedding</h3><ul>
+<li>NLP: Word -&gt; Vector</li>
+<li>Speech: Frame -&gt; Vector</li>
+<li>Image: Pixels&#x2F;Patches -&gt; Vector</li>
+<li>Graph: Node &amp; Edge -&gt; Vector (a molecule can also be modeled as a graph)<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">wte = nn.Embedding(config.vocab_size, config.n_embd)</span><br></pre></td></tr></table></figure></li>
+</ul>
+<h3 id="Positional-Encoding"><a href="#Positional-Encoding" class="headerlink" title="Positional Encoding"></a>Positional Encoding</h3><ol>
+<li>Sinusoidal position representations (original paper)<br>$$<br>p_i &#x3D;<br>\begin{pmatrix}<br>\sin(i &#x2F; 10000^{2 \cdot 1 &#x2F; d}) \<br>\cos(i &#x2F; 10000^{2 \cdot 1 &#x2F; d}) \<br>\vdots \<br>\sin(i &#x2F; 10000^{2 \cdot \frac{d&#x2F;2}{d}}) \<br>\cos(i &#x2F; 10000^{2 \cdot \frac{d&#x2F;2}{d}})<br>\end{pmatrix}<br>$$</li>
+</ol>
+<p>Pros:</p>
+<ul>
+<li>Periodicity indicates that maybe “absolute position” isn’t as important</li>
+<li>Maybe can extrapolate to longer sequences as periods restart</li>
+</ul>
+<p>Cons:</p>
+<ul>
+<li>Not learnable; also the extrapolation doesn’t really work</li>
+</ul>
+<ol start="2">
+<li><p>Learned absolute position representations</p>
+</li>
+<li><p>Other (RoPE, etc.)</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">wpe = nn.Embedding(config.block_size, config.n_embd) #Learnable Embedding, update matrix (block_size,n_embd)</span><br></pre></td></tr></table></figure>
+<p>Then these two vectors are added during the forward pass.</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">tok_emb = self.transformer.wte(idx) </span><br><span class="line">pos_emb = self.transformer.wpe(pos)</span><br><span class="line">x = self.transformer.drop(tok_emb + pos_emb)</span><br><span class="line">for block in self.transformer.h:</span><br><span class="line">    x = block(x)</span><br><span class="line">x = self.transformer.ln_f(x)</span><br></pre></td></tr></table></figure></li>
+</ol>
+<h3 id="Encoder"><a href="#Encoder" class="headerlink" title="Encoder"></a>Encoder</h3><p>The encoder is composed of a stack of N identical layers (they do not share weights).</p>
+<h4 id="Multi-head-attention"><a href="#Multi-head-attention" class="headerlink" title="Multi-head attention"></a>Multi-head attention</h4><blockquote>
+<p>X (input matrix) * W_i_q,W_i_k,W_i_v (weight matrices) -&gt; Q_i,K_i,V_i (attention matrices) -&gt; multiply &amp; softmax -&gt; different Z matrices -&gt; concat -&gt; * a weight matrix W_o -&gt; the output Z matrix (with enough information from the sequence) to be sent forward to the FFN</p>
+</blockquote>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br><span class="line">78</span><br><span class="line">79</span><br><span class="line">80</span><br><span class="line">81</span><br><span class="line">82</span><br><span class="line">83</span><br><span class="line">84</span><br><span class="line">85</span><br><span class="line">86</span><br><span class="line">87</span><br><span class="line">88</span><br><span class="line">89</span><br><span class="line">90</span><br><span class="line">91</span><br></pre></td><td class="code"><pre><span class="line">class MultiHeadSelfAttentionEncoder(nn.Module):</span><br><span class="line">    def __init__(self, n_embd, n_head, dropout=0.1):</span><br><span class="line">        super().__init__()</span><br><span class="line"></span><br><span class="line">        assert n_embd % n_head == 0</span><br><span class="line"></span><br><span class="line">        self.n_embd = n_embd</span><br><span class="line">        self.n_head = n_head</span><br><span class="line">        self.head_dim = n_embd // n_head</span><br><span class="line"></span><br><span class="line">        # Each head has its own W_i_q, W_i_k, and W_i_v</span><br><span class="line">        self.W_q = nn.ModuleList([</span><br><span class="line">            nn.Linear(n_embd, self.head_dim) for _ in range(n_head)</span><br><span class="line">        ])</span><br><span class="line">        self.W_k = nn.ModuleList([</span><br><span class="line">            nn.Linear(n_embd, self.head_dim) for _ in range(n_head)</span><br><span class="line">        ])</span><br><span class="line">        self.W_v = nn.ModuleList([</span><br><span class="line">            nn.Linear(n_embd, self.head_dim) for _ in range(n_head)</span><br><span class="line">        ])</span><br><span class="line"></span><br><span class="line">        # Output projection matrix W_o after concatenating all heads</span><br><span class="line">        self.W_o = nn.Linear(n_embd, n_embd)</span><br><span class="line"></span><br><span class="line">        self.dropout = nn.Dropout(dropout)</span><br><span class="line"></span><br><span class="line">    def forward(self, X, padding_mask=None):</span><br><span class="line">        &quot;&quot;&quot;</span><br><span class="line">        X:</span><br><span class="line">            Input matrix.</span><br><span class="line">            Shape = (batch_size, seq_len, n_embd)</span><br><span class="line"></span><br><span class="line">        padding_mask:</span><br><span class="line">            Shape = (batch_size, seq_len)</span><br><span class="line"></span><br><span class="line">            1 / True  means a real token.</span><br><span class="line">            0 / False means a padding token.</span><br><span class="line"></span><br><span class="line">            Example:</span><br><span class="line">            [[1, 1, 1, 0],</span><br><span class="line">             [1, 1, 1, 1]]</span><br><span class="line">        &quot;&quot;&quot;</span><br><span class="line"></span><br><span class="line">        B, T, C = X.shape</span><br><span class="line"></span><br><span class="line">        head_outputs = []</span><br><span class="line"></span><br><span class="line">        for i in range(self.n_head):</span><br><span class="line">            # X * W_i_q, X * W_i_k, X * W_i_v -&gt; Q_i, K_i, V_i</span><br><span class="line">            Q_i = self.W_q[i](X)   # (B, T, head_dim)</span><br><span class="line">            K_i = self.W_k[i](X)   # (B, T, head_dim)</span><br><span class="line">            V_i = self.W_v[i](X)   # (B, T, head_dim)</span><br><span class="line"></span><br><span class="line">            # Compute attention scores: Q_i * K_i^T</span><br><span class="line">            scores = Q_i @ K_i.transpose(-2, -1)   # (B, T, T)</span><br><span class="line"></span><br><span class="line">            # Scale the scores by sqrt(head_dim)</span><br><span class="line">            scores = scores / math.sqrt(self.head_dim)</span><br><span class="line"></span><br><span class="line">            # Encoder self-attention does not use a causal mask.</span><br><span class="line">            # However, padding tokens should not be attended to.</span><br><span class="line">            if padding_mask is not None:</span><br><span class="line">                # padding_mask: (B, T)</span><br><span class="line">                # Convert it to shape (B, 1, T) to mask key positions.</span><br><span class="line">                scores = scores.masked_fill(</span><br><span class="line">                    padding_mask[:, None, :] == 0,</span><br><span class="line">                    float(&quot;-inf&quot;)</span><br><span class="line">                )</span><br><span class="line"></span><br><span class="line">            # Apply softmax to get attention weights</span><br><span class="line">            attn_weights = F.softmax(scores, dim=-1)   # (B, T, T)</span><br><span class="line">            attn_weights = self.dropout(attn_weights)</span><br><span class="line"></span><br><span class="line">            # attention weights * V_i -&gt; Z_i</span><br><span class="line">            Z_i = attn_weights @ V_i   # (B, T, head_dim)</span><br><span class="line"></span><br><span class="line">            head_outputs.append(Z_i)</span><br><span class="line"></span><br><span class="line">        # Concatenate all Z_i matrices from different heads</span><br><span class="line">        Z_concat = torch.cat(head_outputs, dim=-1)   # (B, T, n_embd)</span><br><span class="line"></span><br><span class="line">        # Concatenated output -&gt; W_o -&gt; final output Z</span><br><span class="line">        Z = self.W_o(Z_concat)   # (B, T, n_embd)</span><br><span class="line">        Z = self.dropout(Z)</span><br><span class="line"></span><br><span class="line">        # Set the outputs at padding positions to zero</span><br><span class="line">        if padding_mask is not None:</span><br><span class="line">            Z = Z.masked_fill(padding_mask[:, :, None] == 0, 0.0)</span><br><span class="line"></span><br><span class="line">        return Z</span><br><span class="line"></span><br></pre></td></tr></table></figure>
+
+<h4 id="Feed-Forward"><a href="#Feed-Forward" class="headerlink" title="Feed Forward"></a>Feed Forward</h4><p>MLP</p>
+<p>Additional:</p>
+<ul>
+<li>Residual connections<br>$x_\ell &#x3D; F(x_{\ell-1}) + x_{\ell-1}$</li>
+</ul>
+<p>Deep networks are bad at learning identity functions. Adding the input to the output prevents the network from “forgetting” or distorting important information as it is processed by many layers.</p>
+<figure>
+ <img src="res visualization.png" alt="Loss landscape visualization." width="260">
+ <figcaption>Loss landscape visualization (<a target="_blank" rel="noopener" href="https://arxiv.org/abs/1712.09913">Li et al., 2018</a>)<br>image source: <a target="_blank" rel="noopener" href="https://arxiv.org/abs/1712.09913">Visualizing the Loss Landscape of Neural Nets</a></figcaption>
+</figure>
+
+<ul>
+<li>Layer Normalization</li>
+</ul>
+<p>$$<br>x^{\ell’} &#x3D; \frac{x^{\ell} - \mu^{\ell}}{\sigma^{\ell} + \epsilon}<br>$$</p>
+<p>Incorporate learned weight and bias:</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">class LayerNorm(nn.Module):</span><br><span class="line">    def __init__(self,ndim,bias):</span><br><span class="line">        super().__init__()</span><br><span class="line">        self.weight=nn.Parameter(torch.ones(ndim))</span><br><span class="line">        self.bias=nn.Parameter(torch.zeros(ndim)) if bias else None</span><br><span class="line">    </span><br><span class="line">    def forward(self,input):</span><br><span class="line">        return F.layer_norm(input,self.weight.shape,self.weight,self.bias,1e-5)</span><br></pre></td></tr></table></figure>
+<ul>
+<li>weight decay $\theta_t \leftarrow(1-\beta) \theta_{t-1}-\alpha g_t$<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">decay_params = [p for n, p in param_dict.items() if p.dim() &gt;= 2]</span><br><span class="line">nodecay_params = [p for n, p in param_dict.items() if p.dim() &lt; 2]</span><br></pre></td></tr></table></figure></li>
+</ul>
+<h3 id="Decoder"><a href="#Decoder" class="headerlink" title="Decoder"></a>Decoder</h3><p>The decoder is also composed of a stack of N identical layers.</p>
+<h4 id="Masked-Self-Attention"><a href="#Masked-Self-Attention" class="headerlink" title="Masked Self-Attention"></a>Masked Self-Attention</h4><ul>
+<li><p>mask information about future tokens to -inf</p>
+</li>
+<li><p>output &#x3D; softmax $\left(Q K^{T} &#x2F; \sqrt{d_{k}}\right) V$</p>
+</li>
+</ul>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">att=(q@k.transpose(-2,-1))*(1.0/math.sqrt(k.size(-1))) </span><br><span class="line">att=att.masked_fill(self.bias[:,:,:T,:T]==0,float(&#x27;-inf&#x27;)) </span><br><span class="line">att=F.softmax(att,dim=-1)</span><br><span class="line">att=self.attn_dropout(att) </span><br><span class="line">y=att@v</span><br></pre></td></tr></table></figure>
+<h4 id="Cross-attention"><a href="#Cross-attention" class="headerlink" title="Cross attention"></a>Cross attention</h4><p>k &amp; v from encoder, q from the decoder</p>
+<h4 id="Feed-Forward-1"><a href="#Feed-Forward-1" class="headerlink" title="Feed Forward"></a>Feed Forward</h4><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line">class MLP(nn.Module):</span><br><span class="line">    def __init__(self,config):</span><br><span class="line">        super().__init__()</span><br><span class="line">        self.c_fc=nn.Linear(config.n_embd,4*config.n_embd,bias=config.bias)</span><br><span class="line">        self.gelu=nn.GELU()</span><br><span class="line">        self.c_proj=nn.Linear(4*config.n_embd,config.n_embd,bias=config.bias) </span><br><span class="line">        self.dropout=nn.Dropout(config.dropout) </span><br><span class="line">    </span><br><span class="line">    def forward(self,x):</span><br><span class="line">        x=self.c_fc(x)</span><br><span class="line">        x=self.gelu(x)</span><br><span class="line">        x=self.c_proj(x)</span><br><span class="line">        x=self.dropout(x)</span><br><span class="line">        return x</span><br></pre></td></tr></table></figure>
+<h3 id="Final-layers"><a href="#Final-layers" class="headerlink" title="Final layers"></a>Final layers</h3><h4 id="Linear-layer"><a href="#Linear-layer" class="headerlink" title="Linear layer"></a>Linear layer</h4><p>project the embeddings into a much longer vector of logits</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">self.lm_head = nn.Linear(config.n_embd, config.vocab_size, bias=False)</span><br><span class="line">logits = self.lm_head(x)</span><br></pre></td></tr></table></figure>
+<h4 id="Softmax"><a href="#Softmax" class="headerlink" title="Softmax"></a>Softmax</h4><p>generate a probability distribution</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">probs = F.softmax(logits, dim=-1)</span><br></pre></td></tr></table></figure>
+
+<h2 id="LLM"><a href="#LLM" class="headerlink" title="LLM"></a>LLM</h2><p>Decoder-only</p>
+<h3 id="Positional-encoding"><a href="#Positional-encoding" class="headerlink" title="Positional encoding"></a>Positional encoding</h3><p>PE -&gt; RoPE</p>
+<p>Advantage: Rotate the vector according to its position, preserving the angles and the dot products between these vectors.</p>
+<h3 id="Attention"><a href="#Attention" class="headerlink" title="Attention"></a>Attention</h3><p>Reduce computation</p>
+<ul>
+<li>Dense<br>(reducing&#x2F;compressing tensors)<blockquote>
+<p>MHA -&gt; MQA, GQA, MLA</p>
+</blockquote>
+</li>
+<li>Sparse<br>(decrease tokens to compute)<blockquote>
+<p>DSA, SWA, CSA, HCA</p>
+</blockquote>
+</li>
+<li>Linear<br>(O(n^2)-&gt; O(n))<blockquote>
+<p>KDA, Gated DeltaNet, Lightning, Mamba</p>
+</blockquote>
+</li>
+</ul>
+<h3 id="FFN"><a href="#FFN" class="headerlink" title="FFN"></a>FFN</h3><p>Add Router -&gt; MoE</p>
+<h3 id="Residual-connection"><a href="#Residual-connection" class="headerlink" title="Residual connection"></a>Residual connection</h3><p>Some novel methods: dynamically adjusting inter-layer and intra-layer connections to improve gradient flow and feature representation</p>
+<blockquote>
+<p>Hyper-connections(HC), Manifold-constrained hyper-connections(mHC), Attention residuals</p>
+</blockquote>
+<h3 id="Norm"><a href="#Norm" class="headerlink" title="Norm"></a>Norm</h3><ul>
+<li>Method: LayerNorm -&gt; RMSNorm (removing “-Mean”, reducing computational cost)</li>
+<li>Position: pre-norm, post-norm, post-norm before&#x2F;after residual, QK-norm</li>
+</ul>
+<h2 id="AlphaFold"><a href="#AlphaFold" class="headerlink" title="AlphaFold"></a>AlphaFold</h2><p>AlphaFold is regarded by many people as “the most useful thing AI has ever done”. I am not very familiar with non-NLP areas and was surprised to learn that AlphaFold is based on an architecture quite similar to a transformer, if we view the system as three parts (featurization, encoder, and decoder).</p>
+<figure>
+ <img src="evoformer.png" alt="evoformer of AlphaFold" width="750">
+ <figcaption>The Evoformer block of AlphaFold2 (<a target="_blank" rel="noopener" href="https://doi.org/10.1038/s41586-021-03819-2">Jumper et al., 2021</a>), similar to a transformer encoder.<br>image source: <a target="_blank" rel="noopener" href="https://doi.org/10.1038/s41586-021-03819-2">Highly accurate protein structure prediction with AlphaFold</a></figcaption>
+</figure>
+
+<figure>
+ <img src="structure module.png" alt="structure module of AlphaFold" width="550">
+ <figcaption>The Structure module of AlphaFold2 (<a target="_blank" rel="noopener" href="https://doi.org/10.1038/s41586-021-03819-2">Jumper et al., 2021</a>), similar to a transformer decoder.<br>image source: <a target="_blank" rel="noopener" href="https://doi.org/10.1038/s41586-021-03819-2">Highly accurate protein structure prediction with AlphaFold</a></figcaption>
+</figure>
+
+<p>I had intended to record some algorithm details here, but later found myself writing down almost everything in Supplementary Information § 1.6-1.8 because each additional block is so exquisite. Information (features &amp; relations) is modeled into tensors &amp; operations, and each kind of information is incorporated into the computational process recursively. </p>
+<p>I kind of understand why “language is blessed”, as there are many fewer relationships to attend to, so relatively simple transformer architectures work quite well. Information makes up the world, but atomic information without sufficient “relations” is meaningless and misleading. I felt that maybe the power of “attention” is still underexplored if we compare commonly used mechanisms with those in this awesome protein-predicting system.</p>
+<h2 id="Human-Brains"><a href="#Human-Brains" class="headerlink" title="Human Brains"></a>Human Brains</h2><p><a target="_blank" rel="noopener" href="https://arxiv.org/abs/2604.11978">Wang et al. (2026)</a> diagnosed seven typical agent failure modes in their cross-domain study: <em>Instruction Failure, Environmental Failure, False Assumptions, Planning Error, Memory Limitations, Catastrophic Forgetting</em> (key information remains in context but is omitted), and <em>History Error Accumulation</em> (a single early error silently cascades into a failed task). I can’t help thinking that these can be easily avoided by a careful human.</p>
+<p>I was curious about how human brains avoid such mistakes. We humans are quite good at realizing when we are wrong, either from external feedback or internal feelings. We are also blessed with the ability for continual learning and multi-level memory accumulation thanks to our brains. All these abilities are quite generalizable across tasks, with no need for RL training in specific environments. I read a few essays and found the underlying mechanisms quite interesting and inspiring.</p>
+<hr>
+<h3 id="One-shot-perceptual-learning-Hachisuka-et-al-2026"><a href="#One-shot-perceptual-learning-Hachisuka-et-al-2026" class="headerlink" title="One-shot perceptual learning (Hachisuka et al., 2026)"></a>One-shot perceptual learning (<a target="_blank" rel="noopener" href="https://doi.org/10.1038/s41467-026-68711-x">Hachisuka et al., 2026</a>)</h3><p>Human one-shot perceptual learning refers to the remarkable ability to change perception after a single exposure to a disambiguating experience. In this study, it is defined as a phenomenon “whereby a single viewing experience drastically alters visual perception in a long-lasting manner”.<br>A typical example is the Mooney image paradigm: initially ambiguous images become easily recognizable after a single exposure to their clear counterparts, and this improvement can <strong>persist for months</strong>.</p>
+<p>The core neural mechanism proposed in this paper is that <strong>the learned “prior”</strong> is stored in the high-level visual cortex (HLVC), where neural plasticity supports one-shot perceptual learning, rather than in the hippocampus or distributed higher-order control networks. A prior is a structured template that can directly act on visual processing, not knowledge at the linguistic or conceptual level.</p>
+<figure>
+ <img src="HLVC_prior.png" alt="Timing properties of learning-induced activity changes." width="950">
+ <figcaption>How prior knowledge occurs in HLVC and how it affects future perception in the brain (<a target="_blank" rel="noopener" href="https://doi.org/10.1038/s41467-026-68711-x">Hachisuka et al., 2026</a>)<br>image source: <a target="_blank" rel="noopener" href="https://doi.org/10.1038/s41467-026-68711-x">Neural and computational mechanisms underlying one-shot perceptual learning in humans</a></figcaption>
+</figure>
+
+<p>In this study, researchers also implemented a transformer model that captures human behavior (with prior storage module, top-down conditioning) during the one-shot perceptual learning task (a clear image &amp; an ambiguous image). </p>
+<figure>
+ <img src="vision_transformer_mimicing_human.png" alt="model schematic" width="450">
+ <figcaption>The schematic of the model that captures human behavior. The model compares bottom-up features with the “state” module representing prior knowledge, produces top-down conditioning features, and then produces a final output, which is used to update the model state (<a target="_blank" rel="noopener" href="https://doi.org/10.1038/s41467-026-68711-x">Hachisuka et al., 2026</a>)<br>image source: <a target="_blank" rel="noopener" href="https://doi.org/10.1038/s41467-026-68711-x">Neural and computational mechanisms underlying one-shot perceptual learning in humans</a></figcaption>
+</figure>
+
+
+<h3 id="Just-In-Time-Reinforcement-Learning-Continual-Learning-in-LLM-Agents-Without-Gradient-Updates-Li-et-al-2026"><a href="#Just-In-Time-Reinforcement-Learning-Continual-Learning-in-LLM-Agents-Without-Gradient-Updates-Li-et-al-2026" class="headerlink" title="Just-In-Time Reinforcement Learning: Continual Learning in LLM Agents Without Gradient Updates (Li et al., 2026)"></a>Just-In-Time Reinforcement Learning: Continual Learning in LLM Agents Without Gradient Updates (<a target="_blank" rel="noopener" href="https://arxiv.org/abs/2601.18510">Li et al., 2026</a>)</h3><p>This reminded me of a recent inspiring paper on agentic RL (<a target="_blank" rel="noopener" href="https://arxiv.org/abs/2601.18510">Li et al., 2026</a>). They <strong>didn’t do gradient updates</strong> and directly <strong>modulate the LLM’s output logits</strong> (by retrieving relevant trajectories to estimate action advantages). The rule is as follows:</p>
+<p>$$<br>z^{\prime}(s,a) &#x3D; z(s,a) + \beta \cdot \hat{A}(s,a)<br>$$</p>
+<figure>
+ <img src="JitRL.png" alt="Overview of the Just-In-Time Reinforcement Learning (JitRL) framework." width="650">
+ <figcaption>Overview of the framework (<a target="_blank" rel="noopener" href="https://arxiv.org/abs/2601.18510">Li et al., 2026</a>)<br>image source: <a target="_blank" rel="noopener" href="https://arxiv.org/abs/2601.18510">Just-In-Time Reinforcement Learning: Continual Learning in LLM Agents Without Gradient Updates</a></figcaption>
+</figure>
+
+
+<p>This method avoids the enormous computational costs and catastrophic forgetting caused by conventional RL, while preserving the generality of RL compared with In-Context Learning (explicit textual descriptions fail to realize things or skills that are better felt than said).</p>
+<p>They name their algorithm “JitRL (Just-In-Time Reinforcement Learning)” and theoretically prove that this additive update rule is the exact closed-form solution to the KL-constrained policy optimization objective. Maybe such RL methods are closer to the flexibility of our brains’ learning process…</p>
+<hr>
+<h3 id="Error-monitoring"><a href="#Error-monitoring" class="headerlink" title="Error monitoring"></a>Error monitoring</h3><p>Human error processing is a system for detecting <strong>when an action outcome is worse than expected</strong>. This involves:</p>
+<ul>
+<li>Internal Error Monitoring</li>
+<li>External Feedback</li>
+</ul>
+<p>ACC&#x2F;dACC (dorsal anterior cingulate cortex) acts as a central monitoring region for both processes (<a target="_blank" rel="noopener" href="https://doi.org/10.1038/nn1238">Holroyd et al., 2004</a>).</p>
+<h4 id="Flow"><a href="#Flow" class="headerlink" title="Flow:"></a>Flow:</h4><h5 id="1-The-brain-forms-an-intended-action"><a href="#1-The-brain-forms-an-intended-action" class="headerlink" title="1. The brain forms an intended action"></a>1. The brain forms an intended action</h5><h5 id="2-The-brain-compares-action-with-intention"><a href="#2-The-brain-compares-action-with-intention" class="headerlink" title="2. The brain compares action with intention"></a>2. The brain compares action with intention</h5><ul>
+<li>If a mismatch is detected internally, an early error signal appears (<a target="_blank" rel="noopener" href="https://doi.org/10.1111/j.1467-9280.1993.tb00586.x">Gehring et al., 1993</a>)</li>
+</ul>
+<h5 id="3-Internal-error-detection-produces-ERN-error-related-negativity"><a href="#3-Internal-error-detection-produces-ERN-error-related-negativity" class="headerlink" title="3. Internal error detection produces ERN (error-related negativity)"></a>3. Internal error detection produces ERN (error-related negativity)</h5><ul>
+<li>ERN reflects internal self-monitoring: the brain quickly detects that something went wrong before external feedback is needed (peaks in ~50ms after action), and <strong>before the person consciously realizes it</strong> (<a target="_blank" rel="noopener" href="https://doi.org/10.1111/1469-8986.3860752">Nieuwenhuis et al., 2001</a>). </li>
+<li>It is worth noting that ERN reflects the operation of an abstract system for error detection and is <strong>shared by many unrelated tasks</strong>, as suggested in <a target="_blank" rel="noopener" href="https://doi.org/10.1177/1745691618754502">Dehaene’s review (2018)</a>.</li>
+</ul>
+<h5 id="4-External-feedback-produces-FRN-feedback-related-negativity-only-when-it-adds-new-information-after-ERN-Heldmann-et-al-2008"><a href="#4-External-feedback-produces-FRN-feedback-related-negativity-only-when-it-adds-new-information-after-ERN-Heldmann-et-al-2008" class="headerlink" title="4. External feedback produces FRN (feedback-related negativity) only when it adds new information after ERN (Heldmann et al., 2008)"></a>4. External feedback produces FRN (feedback-related negativity) only when it adds new information after ERN (<a target="_blank" rel="noopener" href="https://doi.org/10.1186/1471-2202-9-33">Heldmann et al., 2008</a>)</h5><h5 id="5-The-error-signal-supports-behavioral-adjustment"><a href="#5-The-error-signal-supports-behavioral-adjustment" class="headerlink" title="5. The error signal supports behavioral adjustment"></a>5. The error signal supports behavioral adjustment</h5><figure>
+ <img src="rl_comparision.png" alt="model schematic" width="450">
+ <figcaption>The theoretical model proposed by <a target="_blank" rel="noopener" href="https://doi.org/10.1037/0033-295X.109.4.679">Holroyd &amp; Coles (2002)</a>. Stimulus and feedback information enter the system → multiple motor controllers propose possible actions → the adaptive critic (basal ganglia) evaluates whether the outcome is better or worse than expected and generates a dopamine-based TD error → the anterior cingulate cortex uses this signal to select and train the most appropriate controller → when the outcome is worse than expected, the negative learning signal produces the ERN and supports future behavioral adjustment.<br>image source: <a target="_blank" rel="noopener" href="https://doi.org/10.1037/0033-295X.109.4.679">The neural basis of human error processing: Reinforcement learning, dopamine, and the error-related negativity</a></figcaption>
+</figure>
+
+<p>Our brain is doing RL without our consciousness almost every minute.</p>
+<hr>
+<h3 id="Retuning-of-hippocampal-representations-during-sleep-Maboudi-et-al-2024"><a href="#Retuning-of-hippocampal-representations-during-sleep-Maboudi-et-al-2024" class="headerlink" title="Retuning of hippocampal representations during sleep (Maboudi et al., 2024)"></a>Retuning of hippocampal representations during sleep (<a target="_blank" rel="noopener" href="https://doi.org/10.1038/s41586-024-07397-x">Maboudi et al., 2024</a>)</h3><p>The dreaming mechanism of Claude Code (<a target="_blank" rel="noopener" href="https://platform.claude.com/docs/en/managed-agents/dreams">Anthropic, 2026</a>) has become popular recently, but I have been wondering whether dreaming is limited to information abundance and experience summarization (such as learning or training beyond memorized facts). I personally feel that ~4 hours of sleep keeps me from mastering much of the knowledge from the previous day. The study by <a target="_blank" rel="noopener" href="https://doi.org/10.1038/s41586-024-07397-x">Maboudi et al. (2024)</a> revealed the following mechanisms in mice navigating a maze:</p>
+<ul>
+<li>sleep representations involve reorganization and retuning, not faithful replay</li>
+<li>modifications of spatial representations would take place during sleep<blockquote>
+<p>The similarity of sleep representations to maze PFs decreased progressively.</p>
+</blockquote>
+</li>
+<li>the ripple representations during sleep predicted the future place fields of neurons during re-exposure to the environment</li>
+<li>hippocampal activity supports generative simulation<blockquote>
+<p>Trajectories simulated by the hippocampus during sleep ripples may explore pathways that were not directly experienced during waking.</p>
+</blockquote>
+</li>
+</ul>
+<figure>
+ <img src="neurons_fidelity.png" alt="More modification makes prediction more accurate" width="300">
+ <figcaption>More modification during sleep makes prediction more accurate (<a target="_blank" rel="noopener" href="https://doi.org/10.1038/s41586-024-07397-x">Maboudi et al., 2024</a>)<br>image source: <a target="_blank" rel="noopener" href="https://doi.org/10.1038/s41586-024-07397-x">Retuning of hippocampal representations during sleep</a></figcaption>
+</figure>
+
+<p>So the dreaming mechanism of the brain seems to have an extra component of retuning, predicting, and trying. Is this mechanism partly similar to world models? I’m not sure, but I will come back to this blog when I learn more about it.</p>
+<h2 id="Reflection"><a href="#Reflection" class="headerlink" title="Reflection"></a>Reflection</h2><blockquote>
+<p>Agent systems are systems that are able to accomplish goals on their own, make active decisions, and make plans… You have to have a system that can actively solve problems for you to get to AGI… Agents are that path… —— Demis Hassabis</p>
+</blockquote>
+<p>LLMs are moving from chatboxes to agents that can complete work for us. 2026 has witnessed an outbreak in agent research. From agentic RL, harnesses, and skills to self-evolving methods (context-level, harness-level, parameter-level), all efforts seem to be pushing models from super-human knowledge (gained by large-scale pre-training and transformer architecture) toward human-like intelligence (which needs extra structure and information flow). </p>
+<p>Maybe the argument in <em><a target="_blank" rel="noopener" href="https://openlibrary.org/search?q=A+Brief+History+of+Intelligence+Max+Bennett">A Brief History of Intelligence</a></em> is an inspiring reminder of what intelligence (instead of knowledge) is.</p>
+<figure>
+ <img src="brief_history_of_intelligence.png" alt="The 5 (or 6) breakthroughs of human brain, dating back to 600 million years ago" width="1200">
+ <figcaption>The 5 (or 6) breakthroughs of human brain, dating back to 600 million years ago (<a target="_blank" rel="noopener" href="https://openlibrary.org/search?q=A+Brief+History+of+Intelligence+Max+Bennett">Bennett, 2023</a>)</figcaption>
+</figure>
+
+<p>Can we view the recent agent-related methods as ways to make these abilities more explicit?</p>
+<ul>
+<li>Harness (narrow definition) → steering (#1)</li>
+<li>Agentic RL → reinforcement (#2), simulating (#3) (the ones with critic)</li>
+<li>Extra planning&#x2F;reflection mechanisms &amp; long reasoning process → simulating (#3)</li>
+<li>Self-evolving → reinforcement (#2), simulating (#3)</li>
+<li>Multi-agent collaboration, skills → mentalizing (#4), speaking (#5)</li>
+</ul>
+<p>…</p>
+<h3 id="What’s-next"><a href="#What’s-next" class="headerlink" title="What’s next?"></a>What’s next?</h3><h2 id="References"><a href="#References" class="headerlink" title="References"></a>References</h2><p>Anthropic. (2026). <a target="_blank" rel="noopener" href="https://platform.claude.com/docs/en/managed-agents/dreams">Dreams</a>. Claude Managed Agents documentation.</p>
+<p>Bennett, M. S. (2023). <a target="_blank" rel="noopener" href="https://openlibrary.org/search?q=A+Brief+History+of+Intelligence+Max+Bennett"><em>A brief history of intelligence: Evolution, AI, and the five breakthroughs that made our brains</em></a>. Mariner Books.</p>
+<p>Dehaene, S. (2018). <a target="_blank" rel="noopener" href="https://doi.org/10.1177/1745691618754502">The error-related negativity, self-monitoring, and consciousness</a>. <em>Perspectives on Psychological Science, 13</em>(2), 161–165.</p>
+<p>Gehring, W. J., Goss, B., Coles, M. G. H., Meyer, D. E., &amp; Donchin, E. (1993). <a target="_blank" rel="noopener" href="https://doi.org/10.1111/j.1467-9280.1993.tb00586.x">A neural system for error detection and compensation</a>. <em>Psychological Science, 4</em>, 385–390.</p>
+<p>Hachisuka, J., et al. (2026). <a target="_blank" rel="noopener" href="https://doi.org/10.1038/s41467-026-68711-x">Neural and computational mechanisms underlying one-shot perceptual learning in humans</a>.</p>
+<p>Heldmann, M., et al. (2008). <a target="_blank" rel="noopener" href="https://doi.org/10.1186/1471-2202-9-33">Internal and external information in error processing</a>. <em>BMC Neuroscience, 9</em>, 33.</p>
+<p>Holroyd, C. B., Nieuwenhuis, S., Yeung, N., &amp; Cohen, J. D. (2004). <a target="_blank" rel="noopener" href="https://doi.org/10.1038/nn1238">Dorsal anterior cingulate cortex shows fMRI response to internal and external error signals</a>. <em>Nature Neuroscience, 7</em>(5), 497–498.</p>
+<p>Holroyd, C. B., &amp; Coles, M. G. H. (2002). <a target="_blank" rel="noopener" href="https://doi.org/10.1037/0033-295X.109.4.679">The neural basis of human error processing: Reinforcement learning, dopamine, and the error-related negativity</a>. <em>Psychological Review, 109</em>(4), 679–709.</p>
+<p>Jumper, J., Evans, R., Pritzel, A., Green, T., Figurnov, M., Ronneberger, O., Tunyasuvunakool, K., Bates, R., Žídek, A., Potapenko, A., Bridgland, A., Meyer, C., Kohl, S. A. A., Ballard, A. J., Cowie, A., Romera-Paredes, B., Nikolov, S., Jain, R., Adler, J., … Hassabis, D. (2021). <a target="_blank" rel="noopener" href="https://doi.org/10.1038/s41586-021-03819-2">Highly accurate protein structure prediction with AlphaFold</a>. <em>Nature, 596</em>(7873), 583–589.</p>
+<p>Li, H., Xu, Z., Taylor, G., Studer, C., &amp; Goldstein, T. (2018). <a target="_blank" rel="noopener" href="https://arxiv.org/abs/1712.09913">Visualizing the loss landscape of neural nets</a>. <em>arXiv</em>.</p>
+<p>Li, Y., Lin, Z., Deng, A., Zhang, X., He, Y., Ji, S., Cao, T., &amp; Hooi, B. (2026). <a target="_blank" rel="noopener" href="https://arxiv.org/abs/2601.18510">Just-In-Time Reinforcement Learning: Continual Learning in LLM Agents Without Gradient Updates</a>. <em>arXiv</em>.</p>
+<p>Maboudi, K., Giri, B., Miyawaki, H., Kemere, C., &amp; Diba, K. (2024). <a target="_blank" rel="noopener" href="https://doi.org/10.1038/s41586-024-07397-x">Retuning of hippocampal representations during sleep</a>.</p>
+<p>Nieuwenhuis, S., Ridderinkhof, K. R., Blom, J., Band, G. P. H., &amp; Kok, A. (2001). <a target="_blank" rel="noopener" href="https://doi.org/10.1111/1469-8986.3860752">Error-related brain potentials are differentially related to awareness of response errors: Evidence from an antisaccade task</a>. <em>Psychophysiology, 38</em>(5), 752–760.</p>
+<p>Vaswani, A., Shazeer, N., Parmar, N., Uszkoreit, J., Jones, L., Gomez, A. N., Kaiser, L., &amp; Polosukhin, I. (2017). <a target="_blank" rel="noopener" href="https://arxiv.org/abs/1706.03762">Attention Is All You Need</a>. <em>arXiv</em>.</p>
+<p>Wang, X. J., Bai, H., Sun, Y., Wang, H., Zhang, S., Hu, W., Schroder, M., Mutlu, B., Song, D., &amp; others. (2026). <a target="_blank" rel="noopener" href="https://arxiv.org/abs/2604.11978">The Long-Horizon Task Mirage? Diagnosing Where and Why Agentic Systems Break</a>. <em>arXiv</em>.</p>
+
       
     </div>
 
@@ -313,13 +534,13 @@
     <span class="post-meta-item-icon">
       <i class="fa fa-chart-line"></i>
     </span>
-    <span title="Word count total">0k</span>
+    <span title="Word count total">18k</span>
   </span>
   <span class="post-meta-item">
     <span class="post-meta-item-icon">
       <i class="fa fa-coffee"></i>
     </span>
-    <span title="Reading time total">1 mins.</span>
+    <span title="Reading time total">16 mins.</span>
   </span>
 </div>
   <div class="powered-by">Powered by <a href="https://hexo.io/" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.js.org/muse/" rel="noopener" target="_blank">NexT.Muse</a>
