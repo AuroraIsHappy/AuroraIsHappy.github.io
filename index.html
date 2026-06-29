@@ -306,12 +306,12 @@
 <ul>
 <li>Not learnable; also the extrapolation doesn’t really work</li>
 </ul>
-<ol>
+<ol start="2">
 <li>Learned absolute position representations</li>
 </ol>
 <figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">wpe = nn.Embedding(config.block_size, config.n_embd) #Learnable Embedding, update matrix (block_size,n_embd)</span><br></pre></td></tr></table></figure>
 
-<ol start="2">
+<ol start="3">
 <li>Other (RoPE, etc.)</li>
 </ol>
 <p>Then these two vectors are added during the forward pass.</p>
